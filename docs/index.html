@@ -82,7 +82,7 @@ dialog::backdrop{background:rgba(5,20,50,.55)}
 .step{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--bd)}
 .cm{padding:11px 0;border-bottom:1px solid var(--bd)}.cm small{color:var(--mu)}
 .thumbs{display:flex;gap:8px;flex-wrap:wrap}
-.msg{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#0f1b2d;color:#fff;padding:14px 26px;border-radius:980px;z-index:99;max-width:90vw;font-size:.97rem;font-weight:600;box-shadow:0 10px 36px rgba(0,0,0,.35)}
+.dmsg{display:none;margin:0 22px 10px;padding:10px 14px;border-radius:8px;font-weight:700;font-size:.92rem}.dmsg.err{display:block;background:#d71a2b;color:#fff}.dmsg.ok{display:block;background:#1d7a4d;color:#fff}.msg{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#0f1b2d;color:#fff;padding:14px 26px;border-radius:980px;z-index:99;max-width:90vw;font-size:.97rem;font-weight:600;box-shadow:0 10px 36px rgba(0,0,0,.35)}
 .msg.err{background:#d71a2b}.note{font-size:.88rem;color:var(--mu)}.gal{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}.gal .th{width:84px;height:84px;border-radius:6px;background:var(--line,#456) center/cover no-repeat;border:1px solid var(--line,#456);display:block}.lgt td{vertical-align:top}.hide{display:none!important}
 details summary{cursor:pointer;font-weight:700}
 a{color:var(--pri);text-decoration:none;font-weight:600}a:hover{text-decoration:underline}
@@ -323,7 +323,7 @@ html[data-theme=light] .usr button.b{background:rgba(255,255,255,.1)!important;c
 <div class="usr"><span class="me" id="me"></span><button class="b sec" id="pwbtn" type="button" style="display:none">Đổi mật khẩu</button><button class="b sec" id="thm" type="button"></button><button class="b sec" id="lgb"></button></div></aside>
 <section id="cont"><div class="top"><div><div class="crumb" id="org2"></div><h2 id="pt">Tổng quan</h2></div><div class="topr"><span class="stamp" id="dt0"></span><span id="topact"></span></div></div>
 <main id="main"><p>Đang tải…</p></main></section></div>
-<dialog id="dlg"><div class="dh"><b id="dt"></b><button class="b sec" id="dx">Đóng</button></div><div class="db" id="dbody"></div><div class="df" id="dfoot"></div></dialog>
+<dialog id="dlg"><div class="dh"><b id="dt"></b><button class="b sec" id="dx">Đóng</button></div><div class="db" id="dbody"></div><div id="dmsg" class="dmsg"></div><div class="df" id="dfoot"></div></dialog>
 <div id="toast"></div>
 <script src="config.js"></script>
 <script>
@@ -333,7 +333,19 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){retur
 var LDN=0;function ldOn(){if(!LDN++){var b=$('#ld');if(b){b.className='';void b.offsetWidth;b.className='on'}}}function ldOff(){if(!--LDN){var b=$('#ld');if(b)b.className='done'}}
 var VC={};
 function vcStale(fn){return !/^(list|get|lookup|export)/.test(fn)}
-function gs(fn){ldOn();if(vcStale(fn))VC={};return gs0.apply(null,arguments).then(function(r){ldOff();if(vcStale(fn))VC={};return r},function(e){ldOff();throw e})}
+var INF={};
+function isRead(fn){return /^(list|get|lookup|export)/.test(fn)}
+function transient(fn,e){var m=(e&&e.message)||'';
+  if(/đang bận|Service invoked|too many times|quá nhiều yêu cầu|Rate Limit|temporarily/i.test(m))return true;
+  return isRead(fn)&&/Không kết nối được máy chủ|Máy chủ phản hồi không hợp lệ/.test(m)||fn==='loginPassword'&&/Không kết nối được máy chủ/.test(m)}
+function gsCall(fn,a,n,tok0){return gs0.apply(null,[fn].concat(a)).catch(function(e){
+  if(n<3&&transient(fn,e))return new Promise(function(ok){setTimeout(ok,400*Math.pow(2.5,n)+Math.random()*400)}).then(function(){return gsCall(fn,a,n+1,tok0)});
+  e.tokUsed=tok0;throw e})}
+function gs(fn){var a=[].slice.call(arguments,1),tok0=S.tok||'',key=isRead(fn)?tok0+'|'+fn+'|'+JSON.stringify(a):'';
+  if(key&&INF[key])return INF[key];
+  ldOn();if(vcStale(fn))VC={};
+  var p=gsCall(fn,a,0,tok0).then(function(r){ldOff();if(vcStale(fn))VC={};if(key)delete INF[key];return r},function(e){ldOff();if(key)delete INF[key];throw e});
+  if(key)INF[key]=p;return p}
 /* Hiện ngay bản đã lưu (nếu có) rồi tải mới ở nền; chỉ vẽ lại khi dữ liệu đổi và vẫn đang ở đúng tab. */
 function view(tab,key,fetch,draw){var v=VC[key];
   if(v!==undefined)draw(v,true);else $('#main').innerHTML='<div class="panel"><p class="mu">Đang tải…</p></div>';
@@ -343,13 +355,18 @@ function prefetch(){if(!S.boot||S.boot.me.guest||isReq())return;var a=function(k
 function gs0(fn){var a=[].slice.call(arguments,1);a.unshift(S.tok||'');
   if(window.google&&google.script&&google.script.run)return new Promise(function(ok,no){google.script.run.withSuccessHandler(ok).withFailureHandler(function(e){no(new Error((e&&e.message)||e))})[fn].apply(google.script.run,a)});
   var url=window.APP_API_URL;if(!url||/DÁN/.test(url))return Promise.reject(new Error('Chưa cấu hình địa chỉ API (tệp config.js).'));
-  return fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:a}),redirect:'follow'})
-    .catch(function(){throw new Error('Không kết nối được máy chủ. Hãy kiểm tra mạng và thử lại.')})
-    .then(function(r){return r.json()}).then(function(j){if(!j||!j.ok)throw new Error((j&&j.error)||'Lỗi máy chủ');return j.data})}
-function toast(m,err){var t=$('#toast');t.innerHTML='<div class="msg'+(err?' err':'')+'">'+esc(m)+'</div>';setTimeout(function(){t.innerHTML=''},err?6000:2500)}
-function setTok(t){S.tok=t||'';try{if(t)localStorage.setItem('tok',t);else localStorage.removeItem('tok')}catch(e){}}
+  var ac=window.AbortController?new AbortController():null,tm=ac?setTimeout(function(){ac.abort()},60000):0;
+  return fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:a}),redirect:'follow',signal:ac?ac.signal:undefined})
+    .then(function(r){clearTimeout(tm);return r},function(){clearTimeout(tm);throw new Error('Không kết nối được máy chủ hoặc máy chủ phản hồi quá chậm. Hãy thử lại.')})
+    .then(function(r){return new Promise(function(ok){ok(r.json())}).catch(function(){throw new Error('Máy chủ phản hồi không hợp lệ (có thể đang quá tải). Hãy thử lại.')})}).then(function(j){if(!j||!j.ok)throw new Error((j&&j.error)||'Lỗi máy chủ');return j.data})}
+function toast(m,err){var dg=$('#dlg');if(dg&&dg.open){var dm=$('#dmsg');if(dm){dm.className='dmsg'+(err?' err':' ok');dm.textContent=m;clearTimeout(S.dmt);S.dmt=setTimeout(function(){dm.textContent='';dm.className='dmsg'},err?9000:3000)}}var t=$('#toast');t.innerHTML='<div class="msg'+(err?' err':'')+'">'+esc(m)+'</div>';setTimeout(function(){t.innerHTML=''},err?6000:2500)}
+/* Mỗi tab giữ phiên đăng nhập RIÊNG (sessionStorage) nên mở tab khác đăng nhập user khác không ảnh hưởng tab này.
+   localStorage chỉ lưu phiên đăng nhập gần nhất để tab mới mở ra tự vào được. */
+function getTok(){try{return sessionStorage.getItem('tok')||localStorage.getItem('tok')||''}catch(e){return ''}}
+function setTok(t){var old=S.tok||'';if((t||'')!==old){VC={};S.data=[];S.boot=null;S.thumb={};if(typeof US!=='undefined')US.sel={}}S.tok=t||'';
+  try{if(t){sessionStorage.setItem('tok',t);localStorage.setItem('tok',t)}else{sessionStorage.removeItem('tok');if(localStorage.getItem('tok')===old)localStorage.removeItem('tok')}}catch(e){}}
 function run(p,okmsg){return p.then(function(r){if(okmsg)toast(okmsg);return r}).catch(function(e){
-  if(/AUTH:/.test(e.message)){setTok('');cClear();toast(e.message.replace(/^.*AUTH:\s*/,''),true);closeDlg();boot()}else toast(e.message,true);throw e})}
+  if(/AUTH:/.test(e.message)){if(e.tokUsed!==undefined&&e.tokUsed!==(S.tok||''))throw e;setTok('');cClear();toast(e.message.replace(/^.*AUTH:\s*/,''),true);closeDlg();boot()}else toast(e.message,true);throw e})}
 function canW(){var v=S.boot.me.vai_tro;return v==='Admin'||v==='Editor'}
 function isReq(){return S.boot.me.vai_tro==='Requester'}
 var REQ_E=['sdt','noi_dung','ghi_chu','uu_tien'];
@@ -373,9 +390,9 @@ function base(){return S.data.filter(function(r){return S.f.cu||String(r.legacy)
 function setOrg(n){n=String(n||'Quản lý yêu cầu');var a=n,b='',i=n.indexOf('|');if(i<0){var m=/\s[-–]\s*(QUẢN LÝ.*)$/i.exec(n);if(m){i=m.index}}
   if(i>=0){a=n.slice(0,i).trim();b=n.slice(i).replace(/^\s*[|\-–]\s*/,'').trim()}
   var o2=$('#org2');if(o2)o2.textContent=a+(b?'  /  '+b:'');var o=$('#org');o.innerHTML='<span>'+esc(a)+'</span>'+(b?'<small>'+esc(b)+'</small>':'');try{document.title=a+(b?' · '+b:'')}catch(e){}}
-function cKey(){return S.tok?'u':'g'}
+function cKey(){return S.tok?'u'+String(S.tok).slice(0,12):'g'}
 function cSave(){try{localStorage.setItem('c_'+cKey(),JSON.stringify({b:S.boot,d:S.data}))}catch(e){}}
-function cClear(){try{localStorage.removeItem('c_u');localStorage.removeItem('c_g')}catch(e){}}
+function cClear(){try{Object.keys(localStorage).forEach(function(k){if(k.indexOf('c_')===0)localStorage.removeItem(k)})}catch(e){}}
 function applyBoot(b,list){
   S.boot=b;setOrg(b.settings.ORG_NAME||'Quản lý yêu cầu');var m=b.me;
   $('#me').textContent=m.guest?'Khách · chỉ xem':m.ten+' · '+m.vai_tro+(m.cap_duyet?' · duyệt cấp '+m.cap_duyet:'');
@@ -385,17 +402,17 @@ function applyBoot(b,list){
   $('#nav').innerHTML=tabs.map(function(t){return '<button data-t="'+t[0]+'">'+t[1]+'</button>'}).join('');
   S.data=list;render();clearTimeout(S.pf);S.pf=setTimeout(prefetch,900)}
 function boot(){
-  try{S.tok=S.tok||localStorage.getItem('tok')||''}catch(e){}
+  S.tok=S.tok||getTok();var tk0=S.tok;
   var hadCache=false;
   try{var c=JSON.parse(localStorage.getItem('c_'+cKey())||'null');if(c&&c.b&&c.d){hadCache=true;applyBoot(c.b,c.d)}}catch(e){}
   gs('getInit').then(function(x){var b=x.boot;
     if(b.needLogin){S.boot=null;setOrg(b.org||'Quản lý yêu cầu');$('#me').textContent='';$('#nav').innerHTML='';$('#lgb').style.display='none';
-      $('#main').innerHTML='<div class="panel"><h3>Cần đăng nhập</h3><p>'+esc(b.msg||'')+'</p><button class="b" id="lgo">Đăng nhập</button></div>';if(S.tok){setTok('')}cClear();return}
+      $('#main').innerHTML='<div class="panel"><h3>Cần đăng nhập</h3><p>'+esc(b.msg||'')+'</p><button class="b" id="lgo">Đăng nhập</button></div>';if(S.tok&&S.tok===tk0){setTok('')}cClear();return}
     var ch=!hadCache||JSON.stringify(x.list)!==JSON.stringify(S.data)||JSON.stringify(b)!==JSON.stringify(S.boot);
     if(ch)applyBoot(b,x.list);cSave()})
   .catch(function(e){if(!hadCache)$('#main').innerHTML='<div class="panel"><b>Không truy cập được</b><p>'+esc(e.message)+'</p></div>';else toast(e.message,true)})}
 function loginDlg(step,email,msg){
-  if(step===0||step===undefined||step===1&&!S.mailMode)openDlg('Đăng nhập','<p class="note">Đăng nhập bằng mã VAECO của bạn (ví dụ VAE02284). Lần đầu dùng mật khẩu mặc định do Admin cấp, hệ thống sẽ yêu cầu đổi.</p><div class="f"><div class="w"><label>Mã VAECO</label><input id="lgu" value="'+esc(email||'')+'" autocomplete="username" autocapitalize="characters"></div><div class="w"><label>Mật khẩu</label><input id="lgp" type="password" autocomplete="current-password"></div></div><p class="note"><a href="#" id="lgmail">Đăng nhập bằng mã gửi qua email</a></p>','<button class="b" id="lgpw">Đăng nhập</button>');
+  if(step===0||step===undefined||step===1&&!S.mailMode)openDlg('Đăng nhập','<p class="note">Đăng nhập bằng mã VAECO của bạn (ví dụ VAE02284). Lần đầu dùng mật khẩu mặc định do Admin cấp, hệ thống sẽ yêu cầu đổi.</p><div class="f"><div class="w"><label>Mã VAECO</label><input id="lgu" value="'+esc(email||'')+'" autocomplete="username" autocapitalize="characters"></div><div class="w"><label>Mật khẩu</label><input id="lgp" type="password" autocomplete="current-password"></div></div><p id="lger" class="flag" style="white-space:normal;min-height:1.2em"></p><p class="note"><a href="#" id="lgmail">Đăng nhập bằng mã gửi qua email</a></p>','<button class="b" id="lgpw">Đăng nhập</button>');
   else if(step===1)openDlg('Đăng nhập bằng email','<p class="note">Nhập email đã được Admin đăng ký cho tài khoản của bạn. Hệ thống gửi mã 6 số tới email đó.</p><div class="f"><div class="w"><label>Email</label><input id="lge" type="email" value="'+esc(email||'')+'" autocomplete="email"></div></div><p class="note"><a href="#" id="lgpwl">Quay lại đăng nhập bằng mật khẩu</a></p>','<button class="b" id="lgs">Gửi mã</button>');
   else openDlg('Nhập mã xác nhận','<p class="note">'+esc(msg||'')+'</p><div class="f"><div class="w"><label>Mã 6 số gửi tới '+esc(email)+'</label><input id="lgc" inputmode="numeric" maxlength="6" autocomplete="one-time-code" style="font-size:1.4rem;letter-spacing:6px;text-align:center"></div></div>','<button class="b sec" id="lgback">Quay lại</button><button class="b" id="lgv" data-e="'+esc(email)+'">Đăng nhập</button>')}
 function pwDlg(force){
@@ -547,7 +564,7 @@ function userDlg(u){var isNew=!u;u=u||{vai_tro:'Requester',cap_duyet:'',trang_th
    (u.email?'':'<p class="note" style="grid-column:1/-1">Người dùng mới có mật khẩu mặc định <b>123456@</b> và phải đổi ở lần đăng nhập đầu tiên.</p>')+'<button class="b" id="usave">Lưu</button>')}
 
 /* ---- Hộp thoại ---- */
-function openDlg(t,body,foot){$('#dt').textContent=t;$('#dbody').innerHTML=body;$('#dfoot').innerHTML=foot||'';var d=$('#dlg');if(!d.open){d.showModal();try{document.activeElement.blur()}catch(e){}}}
+function openDlg(t,body,foot){var dm=$('#dmsg');if(dm){dm.textContent='';dm.className='dmsg'}$('#dt').textContent=t;$('#dbody').innerHTML=body;$('#dfoot').innerHTML=foot||'';var d=$('#dlg');if(!d.open){d.showModal();try{document.activeElement.blur()}catch(e){}}}
 function closeDlg(){var d=$('#dlg');if(d.open)d.close()}
 function formData(f){var o={};Array.prototype.forEach.call(f.elements,function(e){if(e.name)o[e.name]=e.value});return o}
 function selHtml(n,arr,v,ph){return '<select name="'+n+'"><option value="">'+(ph||'-- chọn --')+'</option>'+(arr||[]).map(function(x){return '<option'+(x===v?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select>'}
@@ -646,9 +663,9 @@ document.addEventListener('click',function(ev){var t=ev.target,x;
   if(t.id==='lgb'&&t.dataset.mode==='out'){run(gs('logout')).catch(function(){}).then(function(){setTok('');cClear();boot()});return}
   if(t.id==='lgmail'){ev.preventDefault();S.mailMode=true;loginDlg(1);return}
   if(t.id==='lgpwl'){ev.preventDefault();S.mailMode=false;loginDlg(0);return}
-  if(t.id==='lgpw'){var lu=$('#lgu').value,lp=$('#lgp').value;t.disabled=true;run(gs('loginPassword',lu,lp)).then(function(r){setTok(r.tok);closeDlg();toast('Đăng nhập thành công');S.forcePw=!!r.doi_mk;boot()}).catch(function(){}).then(function(){t.disabled=false});return}
+  if(t.id==='lgpw'){var lu=$('#lgu').value.trim(),lp=$('#lgp').value;if(!lu||!lp){toast('Nhập mã VAECO và mật khẩu',true);return}t.disabled=true;t.textContent='Đang đăng nhập…';run(gs('loginPassword',lu,lp)).then(function(r){setTok(r.tok);closeDlg();toast('Đăng nhập thành công');S.forcePw=!!r.doi_mk;boot()}).catch(function(e){var x=$('#lger');if(x)x.textContent=(e&&e.message)||'Không đăng nhập được'}).then(function(){t.disabled=false;t.textContent='Đăng nhập'});return}
   if(t.id==='pwbtn'){pwDlg(false);return}
-  if(t.id==='pwsave'){var p1=$('#pw1').value;if(p1!==$('#pw2').value){toast('Hai mật khẩu mới không khớp',true);return}t.disabled=true;run(gs('changePassword',$('#pw0').value,p1),'Đã đổi mật khẩu').then(function(){S.forcePw=false;closeDlg();boot()}).catch(function(){}).then(function(){t.disabled=false});return}
+  if(t.id==='pwsave'){var p1=$('#pw1').value;if(p1!==$('#pw2').value){toast('Hai mật khẩu mới không khớp',true);return}t.disabled=true;run(gs('changePassword',$('#pw0').value,p1),'Đã đổi mật khẩu').then(function(){S.forcePw=false;if(S.boot&&S.boot.me)S.boot.me.doi_mk=false;cClear();closeDlg();boot()}).catch(function(){}).then(function(){t.disabled=false});return}
   if(t.dataset&&t.dataset.eu){var eu=US.list.filter(function(u){return u.email===t.dataset.eu})[0];if(eu)userDlg(eu);return}
   if(t.dataset&&t.dataset.rpw){if(!confirm('Đặt lại mật khẩu của '+t.dataset.rpw+' về mặc định 123456@ ? Người này sẽ bị đăng xuất và phải đổi mật khẩu khi đăng nhập lại.'))return;t.disabled=true;run(gs('resetPassword',t.dataset.rpw),'Đã đặt lại về mật khẩu mặc định').catch(function(){}).then(function(){t.disabled=false});return}
   if(t.id==='lgback'){S.mailMode=true;loginDlg(1);return}
