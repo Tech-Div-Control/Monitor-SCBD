@@ -370,10 +370,13 @@ function run(p,okmsg){return p.then(function(r){if(okmsg)toast(okmsg);return r})
 function canW(){var v=S.boot.me.vai_tro;return v==='Admin'||v==='Editor'}
 function isReq(){return S.boot.me.vai_tro==='Requester'}
 var REQ_E=['sdt','noi_dung','ghi_chu','uu_tien'];
-function canNew(){return !S.boot.me.guest&&(canW()||isReq())}
+function PB0(){return isPub()}
+function isPub(){return !S.boot||S.boot.me.guest}
+function pubOk(){return !S.boot?!!S.pubMaster:((S.boot.settings||{}).GUEST_GUI!=='0')}
+function canNew(){return S.boot.me.guest?pubOk():(canW()||isReq())}
 function isAdmin(){return S.boot.me.vai_tro==='Admin'}
 function canApp(){var m=S.boot.me;return (m.vai_tro==='Admin'||m.vai_tro==='Editor')&&!!m.cap_duyet}
-function today(){return S.boot.today}
+function today(){if(S.boot&&S.boot.today)return S.boot.today;var d=new Date(),p=function(n){return (n<10?'0':'')+n};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())}
 function dd(a,b){return Math.round((new Date(a+'T00:00:00Z')-new Date(b+'T00:00:00Z'))/864e5)}
 function fmt(d){return d?d.split('-').reverse().join('/'):''}
 var PRIO=['Khẩn','Cao','Bình thường','Thấp'],PRC=['#d71a2b','#ee6a00','#6b7a99','#9aa8c2'];
@@ -396,7 +399,7 @@ function cClear(){try{Object.keys(localStorage).forEach(function(k){if(k.indexOf
 function applyBoot(b,list){
   S.boot=b;setOrg(b.settings.ORG_NAME||'Quản lý yêu cầu');var m=b.me;
   $('#me').textContent=m.guest?'Khách · chỉ xem':m.ten+' · '+m.vai_tro+(m.cap_duyet?' · duyệt cấp '+m.cap_duyet:'');
-  $('#pwbtn').style.display=m.guest?'none':'';if(m.doi_mk&&!m.guest&&!$('#dlg').open)setTimeout(function(){if(!$('#dlg').open)pwDlg(true)},60);$('#lgb').style.display='';$('#lgb').textContent=m.guest?'Đăng nhập':'Đăng xuất';$('#lgb').dataset.mode=m.guest?'in':'out';
+  $('#pwbtn').style.display=m.guest?'none':'';if(m.doi_mk&&!m.guest&&!$('#dlg').open)setTimeout(function(){if(!$('#dlg').open)pwDlg(true)},60);$('#lgb').style.display='';$('#lgb').textContent=m.guest?'Đăng nhập (người tiếp nhận)':'Đăng xuất';$('#lgb').dataset.mode=m.guest?'in':'out';
   var tabs=m.vai_tro==='Requester'?[['tq','Tổng quan'],['ds','Yêu cầu của tôi']]:[['tq','Tổng quan'],['ds','Danh sách'],['gh','Gia hạn']];if(!m.guest&&m.vai_tro!=='Requester')tabs.push(['bc','Báo cáo']);if(isAdmin()){tabs.push(['nk','Nhật ký']);tabs.push(['qt','Quản trị'])}
   if(!tabs.some(function(t){return t[0]===S.tab}))S.tab='tq';
   $('#nav').innerHTML=tabs.map(function(t){return '<button data-t="'+t[0]+'">'+t[1]+'</button>'}).join('');
@@ -407,7 +410,7 @@ function boot(){
   try{var c=JSON.parse(localStorage.getItem('c_'+cKey())||'null');if(c&&c.b&&c.d){hadCache=true;applyBoot(c.b,c.d)}}catch(e){}
   gs('getInit').then(function(x){var b=x.boot;
     if(b.needLogin){S.boot=null;setOrg(b.org||'Quản lý yêu cầu');$('#me').textContent='';$('#nav').innerHTML='';$('#lgb').style.display='none';
-      $('#main').innerHTML='<div class="panel"><h3>Cần đăng nhập</h3><p>'+esc(b.msg||'')+'</p><button class="b" id="lgo">Đăng nhập</button></div>';if(S.tok&&S.tok===tk0){setTok('')}cClear();return}
+      S.pubMaster=b.gui?b.master:null;$('#main').innerHTML=b.gui?'<div class="panel" style="max-width:640px;margin:40px auto;text-align:center"><h3>Gửi yêu cầu sửa chữa / bảo dưỡng</h3><p>Bạn <b>không cần đăng nhập</b> để gửi yêu cầu. Chỉ cần nhập mã VAE và điền phiếu.</p><p><button class="b" id="new" style="font-size:1.05rem;padding:12px 28px">+ Gửi yêu cầu mới</button></p><p class="note">Người tiếp nhận / xử lý yêu cầu: <a href="#" id="lgo">đăng nhập tại đây</a></p></div>':'<div class="panel"><h3>Cần đăng nhập</h3><p>'+esc(b.msg||'')+'</p><button class="b" id="lgo">Đăng nhập</button></div>';if(S.tok&&S.tok===tk0){setTok('')}cClear();return}
     var ch=!hadCache||JSON.stringify(x.list)!==JSON.stringify(S.data)||JSON.stringify(b)!==JSON.stringify(S.boot);
     if(ch)applyBoot(b,x.list);cSave()})
   .catch(function(e){if(!hadCache)$('#main').innerHTML='<div class="panel"><b>Không truy cập được</b><p>'+esc(e.message)+'</p></div>';else toast(e.message,true)})}
@@ -422,7 +425,7 @@ function patch(id,o){S.data.forEach(function(r){if(r.request_id===id)for(var k i
 function thmLbl(){var b=$('#thm');if(b)b.textContent=document.documentElement.getAttribute('data-theme')==='light'?'☾  Giao diện tối':'☀  Giao diện sáng'}
 function render(){thmLbl();
   var sy=window.pageYOffset||0;
-  var ta=$('#topact');if(ta)ta.innerHTML=(S.boot&&canNew())?'<button class="b" id="new">+ Tạo yêu cầu mới</button>':'';var dz=$('#dt0');if(dz)dz.textContent=new Date().toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});Array.prototype.forEach.call(document.querySelectorAll('#nav button'),function(b){b.className=b.dataset.t===S.tab?'on':'';if(b.dataset.t===S.tab)$('#pt').textContent=b.textContent});
+  var ta=$('#topact');if(ta)ta.innerHTML=(S.boot&&canNew())?'<button class="b" id="new">'+(S.boot.me.guest?'+ Gửi yêu cầu mới':'+ Tạo yêu cầu mới')+'</button>':'';var dz=$('#dt0');if(dz)dz.textContent=new Date().toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});Array.prototype.forEach.call(document.querySelectorAll('#nav button'),function(b){b.className=b.dataset.t===S.tab?'on':'';if(b.dataset.t===S.tab)$('#pt').textContent=b.textContent});
   ({tq:vTq,ds:vDs,gh:vGh,bc:vBc,qt:vQt,nk:vNk})[S.tab]();if(sy&&(S.tab==='tq'||S.tab==='ds'))window.scrollTo(0,sy)}
 
 /* ---- Tổng quan ---- */
@@ -553,7 +556,7 @@ function vQt(){view('qt','qt',function(){return gs('getAdminData')},function(res
    '<div class="panel"><h3>Báo cáo định kỳ</h3><p class="note">Hệ thống tự gửi báo cáo tuần (sáng thứ Hai) và báo cáo tháng (sáng ngày 1) tới Admin và cán bộ Tổ/Phòng có bật "Nhận mail", kèm tệp CSV các việc tồn đọng. Bật/tắt và nhập địa chỉ web ở phần Cấu hình bên dưới. Bạn có thể gửi thử ngay:</p>'+
    '<p><button class="b sec" data-rp="week:me">Gửi thử báo cáo tuần cho tôi</button> <button class="b sec" data-rp="month:me">Gửi thử báo cáo tháng cho tôi</button> <button class="b" data-rp="week:all">Gửi báo cáo tuần cho cán bộ Phòng/Tổ</button> <button class="b" data-rp="month:all">Gửi báo cáo tháng cho cán bộ Phòng/Tổ</button></p></div>'+
    '<div class="panel"><h3>Cấu hình</h3><div class="f">'+fld('ORG_NAME','Tên đơn vị')+fld('SAP_HAN_NGAY','Sắp đến hạn (ngày)')+
-   fld('EXT_PHONG_NGAY','Gia hạn dài hơn N ngày cần CB phòng duyệt (0=tắt)')+fld('PAGE_SIZE','Dòng mỗi trang')+fld('KHACH_XEM','Cho khách xem không cần đăng nhập (1/0)')+fld('SESSION_DAYS','Số ngày giữ đăng nhập')+fl1('NOTIFY_AUTO','Thông báo tự động tới đơn vị (1/0)')+fl1('REPORT_WEEKLY','Gửi báo cáo tuần tự động (1/0)')+fl1('REPORT_MONTHLY','Gửi báo cáo tháng tự động (1/0)')+fld('APP_URL','Địa chỉ web của hệ thống (đưa vào nút "Mở hệ thống" trong email)')+'</div><p><button class="b" id="ss">Lưu cấu hình</button> <button class="b sec" id="vl">Kiểm tra toàn vẹn nhật ký</button></p></div>';
+   fld('EXT_PHONG_NGAY','Gia hạn dài hơn N ngày cần CB phòng duyệt (0=tắt)')+fld('PAGE_SIZE','Dòng mỗi trang')+fld('KHACH_XEM','Cho khách xem không cần đăng nhập (1/0)')+fld('GUEST_GUI','Cho phép gửi yêu cầu không cần đăng nhập (1/0, mặc định 1)')+fld('SESSION_DAYS','Số ngày giữ đăng nhập')+fl1('NOTIFY_AUTO','Thông báo tự động tới đơn vị (1/0)')+fl1('REPORT_WEEKLY','Gửi báo cáo tuần tự động (1/0)')+fl1('REPORT_MONTHLY','Gửi báo cáo tháng tự động (1/0)')+fld('APP_URL','Địa chỉ web của hệ thống (đưa vào nút "Mở hệ thống" trong email)')+'</div><p><button class="b" id="ss">Lưu cấu hình</button> <button class="b sec" id="vl">Kiểm tra toàn vẹn nhật ký</button></p></div>';
   uDraw()})}
 function userDlg(u){var isNew=!u;u=u||{vai_tro:'Requester',cap_duyet:'',trang_thai:'Hoạt động',nhan_mail:0};
   var sel=function(n,l,v){return '<select name="'+n+'">'+l.map(function(x){return '<option value="'+x[0]+'"'+(x[0]===v?' selected':'')+'>'+x[1]+'</option>'}).join('')+'</select>'};
@@ -569,16 +572,16 @@ function closeDlg(){var d=$('#dlg');if(d.open)d.close()}
 function formData(f){var o={};Array.prototype.forEach.call(f.elements,function(e){if(e.name)o[e.name]=e.value});return o}
 function selHtml(n,arr,v,ph){return '<select name="'+n+'"><option value="">'+(ph||'-- chọn --')+'</option>'+(arr||[]).map(function(x){return '<option'+(x===v?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select>'}
 function selD(n,arr,v,W){arr=(arr||[]).slice();if(v&&arr.indexOf(v)<0)arr.unshift(v);return '<select name="'+n+'"'+(W?'':' disabled')+'><option value="">'+(n==='loai'?'(chưa phân loại)':'(không)')+'</option>'+arr.map(function(x){return '<option'+(x===v?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select>'}
-function newDlg(){var M=S.boot.master,R=isReq(),me=S.boot.me;
+function newDlg(){var PB=isPub(),M=PB?(S.boot?S.boot.master:S.pubMaster):S.boot.master,R=PB||isReq(),me=PB?{}:S.boot.me;
   var ph='<div class="w"><label>Ảnh đính kèm (không bắt buộc, tối đa 50 MB mỗi yêu cầu, ảnh tự thu nhỏ)</label><input type="file" id="nfl" accept="image/*" multiple><div id="nfl2" class="mu"></div></div>';
   if(R){var dvs=(M.dv_gui||[]).slice();if(me.don_vi&&dvs.indexOf(me.don_vi)<0)dvs.unshift(me.don_vi);
-   openDlg('Gửi yêu cầu mới','<p class="note">Gõ <b>mã VAE</b> vào ô Người gửi, hệ thống tự điền họ tên, số điện thoại, đơn vị (có thể sửa tay). Người tiếp nhận sẽ nhận email, kiểm tra và phân loại yêu cầu. Bạn theo dõi ở mục "Yêu cầu của tôi".</p><form class="f" id="nf">'+
+   openDlg('Gửi yêu cầu mới',(PB?'<p class="note"><b>Không cần đăng nhập.</b> Nhập mã VAE của người gửi, hệ thống tự điền họ tên, đơn vị. Người tiếp nhận sẽ nhận email, kiểm tra và phân loại yêu cầu.</p>':'<p class="note">Gõ <b>mã VAE</b> vào ô Người gửi, hệ thống tự điền họ tên, số điện thoại, đơn vị (có thể sửa tay). Người tiếp nhận sẽ nhận email, kiểm tra và phân loại yêu cầu. Bạn theo dõi ở mục "Yêu cầu của tôi".</p>')+'<form class="f" id="nf">'+(PB?'<input name="hp" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px">':'')+
    '<div><label>Ngày gửi yêu cầu</label><input type="date" name="ngay_tn" value="'+today()+'"></div>'+
-   '<div><label>Người gửi yêu cầu * (gõ mã VAE hoặc họ tên)</label><input name="nguoi_gui" value="'+esc(me.ten||'')+'" autocomplete="off" placeholder="VD: VAE02284"><small class="mu" id="ngh"></small></div>'+
-   '<div><label>Số điện thoại</label><input name="sdt" value="'+esc(me.sdt||'')+'"></div>'+
-   '<div><label>Đơn vị gửi *</label>'+selHtml('dv_gui',dvs,me.don_vi||'')+'</div>'+
+   '<div><label>'+(PB?'Mã VAE của người gửi *':'Người gửi yêu cầu * (gõ mã VAE hoặc họ tên)')+'</label><input name="nguoi_gui" value="'+esc(me.ten||'')+'" autocomplete="off" placeholder="VD: VAE02284"'+(PB?' autofocus':'')+'><small class="mu" id="ngh"></small></div>'+
+   '<div><label>Số điện thoại</label><input name="sdt" value="'+esc(me.sdt||'')+'"'+(PB?' placeholder="Để trống nếu đã có trong danh sách"':'')+'></div>'+
+   '<div><label>Đơn vị gửi'+(PB?'':' *')+'</label>'+selHtml('dv_gui',dvs,me.don_vi||'',PB?'(tự điền theo mã VAE)':'')+'</div>'+
    '<div><label>Mức ưu tiên</label>'+prioSel('Bình thường',true)+'</div><div><label>Hạn hoàn thành dự kiến *</label><input type="date" name="deadline"></div>'+
-   '<div class="w"><label>Nội dung yêu cầu *</label><textarea name="noi_dung" placeholder="Mô tả thiết bị / vị trí / sự cố / yêu cầu cụ thể"></textarea></div><div class="w"><label>Ghi chú</label><textarea name="ghi_chu"></textarea></div>'+ph+'</form>','<button class="b" id="nsave">Gửi yêu cầu</button>')}
+   '<div class="w"><label>Nội dung yêu cầu *</label><textarea name="noi_dung" placeholder="Mô tả thiết bị / vị trí / sự cố / yêu cầu cụ thể"></textarea></div><div class="w"><label>Ghi chú</label><textarea name="ghi_chu"></textarea></div>'+ph+'<p id="nerr" class="flag" style="white-space:normal;grid-column:1/-1"></p></form>','<button class="b" id="nsave">Gửi yêu cầu</button>')}
   else openDlg('Tiếp nhận yêu cầu mới','<form class="f" id="nf"><div><label>Ngày tiếp nhận</label><input type="date" name="ngay_tn" value="'+today()+'"></div><div><label>Người gửi yêu cầu *</label><input name="nguoi_gui"></div><div><label>Số điện thoại</label><input name="sdt"></div><div><label>Đơn vị gửi *</label>'+selHtml('dv_gui',M.dv_gui)+'</div>'+
    '<div><label>Loại yêu cầu *</label>'+selHtml('loai',M.loai)+'</div><div><label>Đơn vị tiếp nhận *</label>'+selHtml('dv_tn',M.dv_tn)+'</div><div><label>Nhóm sửa chữa</label>'+selHtml('nhom',M.nhom,'','(không)')+'</div><div><label>Mức ưu tiên</label>'+prioSel('Bình thường',true)+'</div>'+
    '<div class="w" id="bm"></div>'+
@@ -719,9 +722,13 @@ document.addEventListener('click',function(ev){var t=ev.target,x;
   if(t.id==='rx'){doExport();return}
   if(t.id==='ilc'||t.id==='ila'){var ap=t.id==='ila';if(ap&&!confirm('Áp dụng cập nhật dữ liệu cũ từ sheet NHAP_CU_VP / NHAP_CU_PV?'))return;t.disabled=true;
     run(gs('importLegacy',ap)).then(function(r){openDlg(ap?'Kết quả cập nhật':'Kết quả kiểm tra (chưa ghi)','<p>Dòng trong file: <b>'+r.tongFile+'</b> · Thêm mới: <b>'+r.moi+'</b> · Cập nhật: <b>'+r.capNhat+'</b> · Giữ nguyên: <b>'+r.giuNguyen+'</b> · Không còn trong file: <b>'+r.khongCon+'</b></p>'+(r.loi.length?'<p class="flag">Lỗi cần sửa ('+r.loi.length+'):</p>'+r.loi.slice(0,30).map(function(x){return '<div>'+esc(x)+'</div>'}).join(''):'')+r.thongBao.map(function(x){return '<p class="note">'+esc(x)+'</p>'}).join('')+(r.mau.length?'<p class="note">Ví dụ thay đổi:</p>'+r.mau.map(function(x){return '<div>'+esc(x)+'</div>'}).join(''):''),'');if(ap)return load()}).catch(function(){}).then(function(){t.disabled=false});return}
-  if(t.id==='nsave'){var o=formData($('#nf')),ng=$('#nf').elements.nguoi_gui;if(ng&&ng.dataset.ma)o.ma_gui=ng.dataset.ma;var fl=[].slice.call(($('#nfl')||{}).files||[]);t.disabled=true;var newId='';
+  if(t.id==='nsave'){var PB=isPub(),o=formData($('#nf')),ng=$('#nf').elements.nguoi_gui;if(ng&&ng.dataset.ma)o.ma_gui=ng.dataset.ma;else if(PB&&/^vae\d{3,}$/i.test((o.nguoi_gui||'').trim()))o.ma_gui=o.nguoi_gui.trim();var fl=[].slice.call(($('#nfl')||{}).files||[]);t.disabled=true;var newId='',uk='',ne=$('#nerr');if(ne)ne.textContent='';
     var bad=fl.filter(function(f){return !/^image\//.test(f.type)});if(bad.length){toast('Chỉ đính kèm được ảnh',true);t.disabled=false;return}
-    run(gs('createRequest',o)).then(function(r){newId=r.request_id;S.f.tt='';return fl.length?uploadList(newId,fl,function(i,n){t.textContent='Đang tải ảnh '+i+'/'+n+'…'}):0}).then(function(){closeDlg();toast('Đã '+(isReq()?'gửi':'tạo')+' '+newId);return load()}).catch(function(e){if(newId){closeDlg();load();toast('Đã tạo '+newId+' nhưng tải ảnh lỗi: '+(e&&e.message||''),true)}}).then(function(){t.disabled=false;t.textContent=isReq()?'Gửi yêu cầu':'Tạo yêu cầu'});return}
+    if(PB&&!o.ma_gui){if(ne)ne.textContent='Hãy nhập mã VAE hợp lệ của người gửi (VD: VAE02284).';t.disabled=false;return}
+    (PB?gs('submitPublic',o):run(gs('createRequest',o))).then(function(r){newId=r.request_id;uk=r.ukey||'';S.f.tt='';return fl.length?uploadList(newId,fl,function(i,n){t.textContent='Đang tải ảnh '+i+'/'+n+'…'},uk):0}).then(function(){closeDlg();
+      if(PB){openDlg('Đã gửi yêu cầu','<p style="font-size:1.05rem">Yêu cầu của bạn đã được ghi nhận với mã <b>'+esc(newId)+'</b>.</p><p class="note">Người tiếp nhận đã được báo qua email và sẽ kiểm tra, phân loại, xử lý. Bạn không cần làm gì thêm. Nếu cần bổ sung, hãy liên hệ người tiếp nhận kèm mã yêu cầu trên.</p>','<button class="b" id="again">Gửi yêu cầu khác</button>');if(S.boot)load().catch(function(){});return}
+      toast('Đã '+(isReq()?'gửi':'tạo')+' '+newId);return load()}).catch(function(e){if(newId){closeDlg();if(PB)openDlg('Đã gửi yêu cầu','<p>Yêu cầu đã được ghi nhận với mã <b>'+esc(newId)+'</b>, nhưng tải ảnh bị lỗi: '+esc((e&&e.message)||'')+'</p><p class="note">Hãy gửi ảnh trực tiếp cho người tiếp nhận.</p>','<button class="b" id="again">Đóng</button>');else{load();toast('Đã tạo '+newId+' nhưng tải ảnh lỗi: '+(e&&e.message||''),true)}}else if(PB&&ne)ne.textContent=(e&&e.message)||'Không gửi được, hãy thử lại.'}).then(function(){t.disabled=false;t.textContent=PB||isReq()?'Gửi yêu cầu':'Tạo yêu cầu'});return}
+  if(t.id==='again'){closeDlg();if(PB0()){newDlg()};return}
   var dg=$('#dlg'),id=dg.dataset.id;
   if(t.id==='esv'){var o=formData($('#ef')),pt={};['uu_tien','ngay_tn','nguoi_gui','sdt','dv_gui','loai','dv_tn','noi_dung','nhom','ghi_chu','ma_bravo'].forEach(function(k){if(o[k]!==undefined)pt[k]=String(o[k]).trim()});patch(id,pt);if(isReq()){var q={};REQ_E.forEach(function(k){if(o[k]!==undefined)q[k]=o[k]});o=q}t.disabled=true;t.textContent='Đang lưu…';run(gs('updateRequest',id,o)).then(function(r){closeDlg();toast(r&&r.doi===0?'Không có thay đổi nào cần lưu':'Đã lưu thông tin yêu cầu '+id);load()}).catch(function(){t.disabled=false;t.textContent='Lưu thông tin';load()});return}
   if(t.id==='rs'){var n=prompt('Ghi chú rà soát (không bắt buộc):');if(n===null)return;patch(id,{ra_soat:0});run(gs('resolveReview',id,n),'Đã rà soát').then(function(){load();detail(id)}).catch(function(){load()});return}
@@ -746,11 +753,11 @@ document.addEventListener('change',function(ev){var t=ev.target;
   if(t.closest&&t.closest('#nf')&&(t.name==='loai'||t.name==='dv_tn')){ruleHint();return}
   if(t.id==='fl'){upload(t.files)}});
 document.addEventListener('input',function(ev){var tg=ev.target;
-  if(tg.name==='nguoi_gui'&&tg.closest&&tg.closest('#nf')&&isReq()){delete tg.dataset.ma;var v=tg.value.trim(),hn=$('#ngh');clearTimeout(S.lk);
+  if(tg.name==='nguoi_gui'&&tg.closest&&tg.closest('#nf')&&(isPub()||isReq())){delete tg.dataset.ma;var v=tg.value.trim(),hn=$('#ngh');clearTimeout(S.lk);
     if(!/^vae\d{3,}$/i.test(v)){if(hn)hn.textContent='';return}
-    if(hn)hn.textContent='Đang tra cứu…';S.lk=setTimeout(function(){gs('lookupStaff',v).then(function(s){var f=$('#nf');if(!f||f.elements.nguoi_gui.value.trim()!==v)return;
+    if(hn)hn.textContent='Đang tra cứu…';S.lk=setTimeout(function(){gs(isPub()?'lookupStaffPublic':'lookupStaff',v).then(function(s){var f=$('#nf');if(!f||f.elements.nguoi_gui.value.trim()!==v)return;
       if(!s.found){hn.textContent='Không tìm thấy mã '+v.toUpperCase()+' trong danh sách';return}
-      f.elements.nguoi_gui.value=s.ten;f.elements.nguoi_gui.dataset.ma=s.ma;if(s.sdt)f.elements.sdt.value=s.sdt;
+      f.elements.nguoi_gui.value=s.ten;f.elements.nguoi_gui.dataset.ma=s.ma;if(s.sdt)f.elements.sdt.value=s.sdt;else if(s.coSdt)f.elements.sdt.placeholder='Đã có trong danh sách (có thể để trống)';
       var sel=f.elements.dv_gui;if(s.don_vi){var ok=[].some.call(sel.options,function(o){return o.value===s.don_vi});if(!ok){var op=document.createElement('option');op.textContent=s.don_vi;sel.appendChild(op)}sel.value=s.don_vi}
       hn.textContent='✓ '+s.ma+' · '+(s.don_vi||'')}).catch(function(){if(hn)hn.textContent=''})},350);return}
   if(ev.target.id==='usq'){US.q=ev.target.value;uDraw();return}if(ev.target.id==='q'){S.f.q=ev.target.value;S.page=1;clearTimeout(S.tm);S.tm=setTimeout(function(){var p=ev.target.selectionStart;render();var q=$('#q');q.focus();q.setSelectionRange(p,p)},250)}});
@@ -758,8 +765,8 @@ function shrink(file){return new Promise(function(ok,no){
   if(!/^image\//.test(file.type)){var r=new FileReader();r.onload=function(){ok({name:file.name,mime:file.type,b64:String(r.result).split(',')[1]})};r.onerror=no;r.readAsDataURL(file);return}
   var img=new Image(),u=URL.createObjectURL(file);img.onload=function(){var m=1600,k=Math.min(1,m/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);
     ok({name:file.name.replace(/\.\w+$/,'')+'.jpg',mime:'image/jpeg',b64:c.toDataURL('image/jpeg',.82).split(',')[1]});URL.revokeObjectURL(u)};img.onerror=no;img.src=u})}
-function uploadList(id,files,prog){var l=[].slice.call(files),chain=Promise.resolve(),done=0,sum=0;
-  l.forEach(function(f){chain=chain.then(function(){return shrink(f)}).then(function(o){sum+=Math.floor(o.b64.length*3/4);if(sum>50*1048576)throw new Error('Tổng ảnh vượt 50 MB');if(prog)prog(done+1,l.length);return gs('uploadAttachment',id,o)}).then(function(){done++})});
+function uploadList(id,files,prog,ukey){var l=[].slice.call(files),chain=Promise.resolve(),done=0,sum=0;
+  l.forEach(function(f){chain=chain.then(function(){return shrink(f)}).then(function(o){sum+=Math.floor(o.b64.length*3/4);if(sum>50*1048576)throw new Error('Tổng ảnh vượt 50 MB');if(prog)prog(done+1,l.length);return ukey?gs('uploadPublic',id,ukey,o):gs('uploadAttachment',id,o)}).then(function(){done++})});
   return chain}
 function upload(files){var id=$('#dlg').dataset.id,b=$('#fl');if(b)b.disabled=true;toast('Đang tải ảnh lên…');
   uploadList(id,files).then(function(){toast('Đã tải lên '+files.length+' tệp');refreshPan(id)}).catch(function(e){toast(e.message,true);refreshPan(id)})}
