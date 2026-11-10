@@ -775,6 +775,12 @@ function loadThumbs(){document.querySelectorAll('[data-th]').forEach(function(el
   gs('getFile',id).then(function(f){var u='data:'+f.mime+';base64,'+f.b64;(S.thumb=S.thumb||{})[id]=u;el.style.backgroundImage='url('+u+')'}).catch(function(){})})}
 $('#dlg').addEventListener('close',function(){delete $('#dlg').dataset.id});
 boot();
+
+/* Tự cập nhật: 30 giây hỏi máy chủ một lần (nhẹ); có thay đổi thì tải lại danh sách và báo khi có yêu cầu mới. */
+function pulseTick(){if(!S.boot||S.boot.me.guest||isReq()||document.hidden||S.pulsing)return;var dg=$('#dlg'),ae=document.activeElement;if(dg&&dg.open)return;if(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))return;
+  S.pulsing=1;var tk=S.tok;gsCall('getPulse',[],0,tk).then(function(p){S.pulsing=0;if(tk!==S.tok||!S.boot)return;var old=S.pv,on=S.pn;S.pv=p.v;S.pn=p.n;if(!old||old===p.v)return;
+    gsCall('listRequests',[],0,tk).then(function(d){if(tk!==S.tok)return;S.data=d;VC={};var dd=$('#dlg');if(!(dd&&dd.open)&&/^(tq|ds|gh)$/.test(S.tab))render();cSave();if(on!=null&&p.n>on)toast('Có yêu cầu mới: '+p.id+' — '+p.nd);}).catch(function(){})},function(){S.pulsing=0});}
+setInterval(pulseTick,30000);document.addEventListener('visibilitychange',function(){if(!document.hidden)pulseTick()});
 </script>
 </body>
 </html>
