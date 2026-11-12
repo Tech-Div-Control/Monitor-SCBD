@@ -369,7 +369,7 @@ function run(p,okmsg){return p.then(function(r){if(okmsg)toast(okmsg);return r})
   if(/AUTH:/.test(e.message)){if(e.tokUsed!==undefined&&e.tokUsed!==(S.tok||''))throw e;setTok('');cClear();toast(e.message.replace(/^.*AUTH:\s*/,''),true);closeDlg();boot()}else toast(e.message,true);throw e})}
 function canW(){var v=S.boot.me.vai_tro;return v==='Admin'||v==='Editor'}
 function isReq(){return S.boot.me.vai_tro==='Requester'}
-var REQ_E=['sdt','noi_dung','ghi_chu','uu_tien'];
+var REQ_E=['sdt','noi_dung','ghi_chu'];
 function PB0(){return isPub()}
 function isPub(){return !S.boot||S.boot.me.guest}
 function pubOk(){return !S.boot?!!S.pubMaster:((S.boot.settings||{}).GUEST_GUI!=='0')}
@@ -403,6 +403,7 @@ function applyBoot(b,list){
   var tabs=m.vai_tro==='Requester'?[['tq','Tổng quan'],['ds','Yêu cầu của tôi']]:[['tq','Tổng quan'],['ds','Danh sách'],['gh','Gia hạn']];if(!m.guest&&m.vai_tro!=='Requester')tabs.push(['bc','Báo cáo']);if(isAdmin()){tabs.push(['nk','Nhật ký']);tabs.push(['qt','Quản trị'])}
   if(!tabs.some(function(t){return t[0]===S.tab}))S.tab='tq';
   $('#nav').innerHTML=tabs.map(function(t){return '<button data-t="'+t[0]+'">'+t[1]+'</button>'}).join('');
+  if(m.vai_tro==='Requester'&&!S.reqInit){S.reqInit=1;S.f.tt=''}
   S.data=list;render();clearTimeout(S.pf);S.pf=setTimeout(prefetch,900)}
 function boot(){
   S.tok=S.tok||getTok();var tk0=S.tok;
@@ -451,7 +452,7 @@ function vTq(){
     if(s.qua){var d=dd(T,r.deadline);age[d>90?4:d>30?3:2]++}else if(s.sap)age[1]++;else age[0]++;
     var u=r.dv_tn||'(trống)',o=units[u]=units[u]||{mo:0,qua:0};o.mo++;if(s.qua)o.qua++});
   function K(c,l,n,f,ic){return '<div class="kpi '+c+(n>0&&c!=='blue'&&c!=='slate'?' lit':'')+'" data-nhanh="'+f+'"><i class="ic">'+ic+'</i><b>'+n+'</b><span>'+l+'</span></div>'}
-  var urg=open.filter(function(r){var s=st(r);return pr(r)==='Khẩn'||pr(r)==='Cao'||s.qua||s.sap}).sort(function(a,b){return PRIO.indexOf(pr(a))-PRIO.indexOf(pr(b))||(a.deadline<b.deadline?-1:a.deadline>b.deadline?1:0)});
+  var urg=open.filter(function(r){var s=st(r);return !isNew(r)&&(pr(r)==='Khẩn'||pr(r)==='Cao'||s.qua||s.sap)}).sort(function(a,b){return PRIO.indexOf(pr(a))-PRIO.indexOf(pr(b))||(a.deadline<b.deadline?-1:a.deadline>b.deadline?1:0)});
   var urgH=urg.slice(0,8).map(function(r){var s=st(r),fl=s.qua?'<span class="uf q">Quá '+dd(T,r.deadline)+' ngày</span>':s.sap?'<span class="uf s">Còn '+dd(r.deadline,T)+' ngày</span>':'<span class="uf o">Hạn '+fmt(r.deadline)+'</span>';
     return '<div class="urow" data-id="'+esc(r.request_id)+'">'+prTag(r)+'<div class="ut"><b>'+esc(String(r.noi_dung).slice(0,100))+'</b><small>'+esc(r.dv_gui)+' → '+esc(r.dv_tn)+' · <span class="tag t-'+esc(r.tt)+'" style="padding:1px 9px;font-size:.7rem">'+esc(r.tt)+'</span></small></div>'+fl+'</div>'}).join('')||'<p class="mu">🎉 Không có việc nào cần xử lý gấp.</p>';
   var ms=lastMonths(6),inT=ms.map(function(x){return b.filter(function(r){return (r.ngay_tn||'').slice(0,7)===x}).length}),dnT=ms.map(function(x){return b.filter(function(r){return r.tt==='Closed'&&(r.ngay_xong||'').slice(0,7)===x}).length});
@@ -460,7 +461,7 @@ function vTq(){
   $('#main').innerHTML='<div class="cards">'+
    K('amber','Yêu cầu mới',newR.length,'moi','🆕')+K('blue','Đang mở',open.length,'mo','📂')+K('red','Quá hạn',k.qua,'qua','⏰')+K('pink','Ưu tiên khẩn',k.khan,'khan','🔥')+K('orange','Sắp đến hạn',k.sap,'sap','⚠️')+
    K('cyan','Gia hạn chờ duyệt',k.gh,'gh','📝')+K('green','Đóng trong tháng',k.dm,'dong','✅')+'</div>'+
-   (newR.length?'<div class="panel" style="border-color:var(--warn,#f2a900)"><h3>🆕 Yêu cầu mới chờ tiếp nhận <span class="mu" style="font-weight:500;font-size:.85rem">('+newR.length+' yêu cầu · bấm để mở, điền loại / đơn vị tiếp nhận / nhóm sửa chữa)</span></h3>'+newR.slice(0,6).map(function(r){return '<div class="urow" data-id="'+esc(r.request_id)+'">'+prTag(r)+'<div class="ut"><b>'+esc(String(r.noi_dung).slice(0,100))+'</b><small>'+esc(r.request_id)+' · '+esc(r.dv_gui)+' · '+esc(String(r.nguoi_gui||'').replace(/\s*<.*$/,''))+(r.nguon&&r.nguon.indexOf('không đăng nhập')>=0?' · gửi không đăng nhập':'')+'</small></div><span class="uf o">Hạn '+fmt(r.deadline)+'</span></div>'}).join('')+(newR.length>6?'<p class="mu" style="margin:8px 0 0">…và '+(newR.length-6)+' yêu cầu khác (bấm ô "Yêu cầu mới" để xem hết).</p>':'')+'</div>':'')+
+   (newR.length?'<div class="panel" style="border-color:var(--warn,#f2a900)"><h3>🆕 Yêu cầu mới chờ tiếp nhận <span class="mu" style="font-weight:500;font-size:.85rem">('+newR.length+' yêu cầu · bấm để mở, điền loại / đơn vị tiếp nhận / nhóm sửa chữa)</span></h3>'+newR.slice(0,6).map(function(r){return '<div class="urow" data-id="'+esc(r.request_id)+'">'+prTag(r)+'<div class="ut"><b>'+esc(String(r.noi_dung).slice(0,100))+'</b><small>'+esc(r.request_id)+' · '+esc(r.dv_gui)+' · '+esc(String(r.nguoi_gui||'').replace(/\s*<.*$/,''))+(r.nguon&&r.nguon.indexOf('không đăng nhập')>=0?' · gửi không đăng nhập':'')+'</small></div><span class="uf o">Chờ đặt ưu tiên &amp; hạn</span></div>'}).join('')+(newR.length>6?'<p class="mu" style="margin:8px 0 0">…và '+(newR.length-6)+' yêu cầu khác (bấm ô "Yêu cầu mới" để xem hết).</p>':'')+'</div>':'')+
    '<div class="g32"><div class="panel"><h3>Cần xử lý ngay <span class="mu" style="font-weight:500;font-size:.85rem">('+urg.length+' việc · khẩn/cao, quá hạn hoặc sắp đến hạn)</span></h3>'+urgH+'</div>'+
    '<div class="panel"><h3>Mức độ ưu tiên (đang mở)</h3>'+donut(PRIO.map(function(p,i){return {l:p,n:prc[i],c:PRC[i]}}))+'</div></div>'+
    '<div class="grid2" style="margin-bottom:18px"><div class="panel"><h3>Xu hướng 6 tháng</h3>'+trendSvg(ms,inT,dnT)+'<div class="lg" style="display:flex;gap:18px;justify-content:center"><div><i style="background:var(--pri)"></i>Tiếp nhận</div><div><i style="background:var(--ok)"></i>Hoàn thành</div></div></div>'+
@@ -491,12 +492,13 @@ function vDs(){$('#main').innerHTML=listHtml()}
 function listHtml(){
   var f=S.f,M=S.boot.master,rows=filt(),ps=+S.boot.settings.PAGE_SIZE||25,pg=Math.max(1,Math.min(S.page,Math.ceil(rows.length/ps)||1));S.page=pg;
   var nh=[['','Tất cả'],['moi','Yêu cầu mới chờ tiếp nhận'],['mo','Đang mở'],['qua','Quá hạn'],['sap','Sắp đến hạn'],['pend','Pending kéo dài'],['kcn','Chưa cập nhật'],['gh','Có gia hạn chờ duyệt'],['rs','Cần rà soát'],['dong','Đóng trong tháng'],['khan','Ưu tiên khẩn (đang mở)']];
-  var h='<div class="filters"><input id="q" placeholder="Tìm mã, nội dung, mã Bravo…" value="'+esc(f.q)+'" style="min-width:240px">'+
-   '<select data-sort="1">'+sortOpts()+'</select><select data-f="uu_tien">'+opts(PRIO,f.uu_tien).replace('Tất cả','Ưu tiên')+'</select><select data-f="tt">'+opts(['Open','Inprogress','Pending','Closed'],f.tt).replace('Tất cả','Trạng thái')+'</select>'+
-   '<select data-f="loai">'+opts(M.loai,f.loai).replace('Tất cả','Loại')+'</select><select data-f="dv_gui">'+opts(M.dv_gui,f.dv_gui).replace('Tất cả','Đơn vị gửi')+'</select>'+
-   '<select data-f="dv_tn">'+opts(M.dv_tn,f.dv_tn).replace('Tất cả','Đơn vị tiếp nhận')+'</select><select data-f="nhom">'+opts(M.nhom,f.nhom).replace('Tất cả','Nhóm sửa chữa')+'</select>'+
-   '<select data-f="nhanh">'+nh.map(function(x){return '<option value="'+x[0]+'"'+(x[0]===f.nhanh?' selected':'')+'>'+x[1]+'</option>'}).join('')+'</select>'+
-   '<input type="date" data-f="tu" value="'+f.tu+'" title="Từ ngày tiếp nhận"><input type="date" data-f="den" value="'+f.den+'" title="Đến ngày tiếp nhận">'+
+  var TT=[['','Tất cả trạng thái'],['Open','Open · yêu cầu mới (chưa tiếp nhận)'],['Inprogress','Inprogress · đang xử lý'],['Pending','Pending · tạm dừng'],['Closed','Closed · đã hoàn thành']];
+  var h='<div class="filters"><input id="q" placeholder="Tìm theo nội dung, mã Bravo…" value="'+esc(f.q)+'" style="min-width:260px">'+
+   '<select data-f="tt" title="Trạng thái">'+TT.map(function(x){return '<option value="'+x[0]+'"'+(x[0]===f.tt?' selected':'')+'>'+x[1]+'</option>'}).join('')+'</select>'+
+   '<select data-f="dv_gui" title="Đơn vị gửi">'+opts(M.dv_gui,f.dv_gui).replace('Tất cả','Tất cả đơn vị gửi')+'</select>'+
+   '<select data-f="dv_tn" title="Đơn vị tiếp nhận">'+opts(M.dv_tn,f.dv_tn).replace('Tất cả','Tất cả đơn vị tiếp nhận')+'</select>'+
+   '<select data-sort="1" title="Sắp xếp">'+sortOpts()+'</select>'+
+   (f.nhanh?'<button class="b sec" id="clrn" title="Bỏ lọc nhanh">Lọc nhanh: '+esc((nh.filter(function(x){return x[0]===f.nhanh})[0]||[0,f.nhanh])[1])+' ✕</button>':'')+
    '<label><input type="checkbox" id="cu" '+(f.cu?'checked':'')+'> Gồm dữ liệu cũ</label><button class="b sec" id="clr">Xóa lọc</button><button class="b sec" id="csv">Xuất CSV</button>'+'</div>';
   var cols=[['uu_tien','Ưu tiên'],['ngay_tn','Ngày TN'],['dv_gui','Đơn vị gửi'],['noi_dung','Nội dung'],['loai','Loại'],['dv_tn','ĐV tiếp nhận'],['deadline','Hạn'],['tt','Trạng thái']];
   h+='<div class="tw"><table><thead><tr>'+cols.map(function(c){return '<th data-s="'+c[0]+'">'+c[1]+(S.sort.k===c[0]?(S.sort.d>0?' ▲':' ▼'):'')+'</th>'}).join('')+'<th>Cảnh báo</th></tr></thead><tbody>';
@@ -583,7 +585,6 @@ function newDlg(){var PB=isPub(),M=PB?(S.boot?S.boot.master:S.pubMaster):S.boot.
    '<div><label>Người yêu cầu * <small class="mu" style="font-weight:500">(điền theo mã VAE)</small></label><input name="nguoi_gui" value="'+esc(me.ten||'')+'" autocomplete="off" placeholder="Nhập mã VAE, VD: VAE02284"'+(PB?' autofocus':'')+'><small class="mu" id="ngh"></small></div>'+
    '<div><label>Số điện thoại * <small class="mu" style="font-weight:500">(tự điền, sửa được nếu đã đổi số)</small></label><input name="sdt" type="tel" value="'+esc(me.sdt||'')+'" placeholder="Tự điền theo mã VAE"></div>'+
    '<div><label>Đơn vị gửi'+(PB?'':' *')+'</label>'+selHtml('dv_gui',dvs,me.don_vi||'',PB?'(tự điền theo mã VAE)':'')+'</div>'+
-   '<div><label>Mức ưu tiên</label>'+prioSel('Bình thường',true)+'</div><div><label>Hạn hoàn thành dự kiến *</label><input type="date" name="deadline"></div>'+
    '<div class="w"><label>Nội dung yêu cầu *</label><textarea name="noi_dung" placeholder="Mô tả thiết bị / vị trí / sự cố / yêu cầu cụ thể"></textarea></div><div class="w"><label>Ghi chú</label><textarea name="ghi_chu"></textarea></div>'+ph+'<p id="nerr" class="flag" style="white-space:normal;grid-column:1/-1"></p></form>','<button class="b" id="nsave">Gửi yêu cầu</button>')}
   else openDlg('Tiếp nhận yêu cầu mới','<form class="f" id="nf"><div><label>Ngày tiếp nhận</label><input type="date" name="ngay_tn" value="'+today()+'"></div><div><label>Người gửi yêu cầu *</label><input name="nguoi_gui"></div><div><label>Số điện thoại</label><input name="sdt"></div><div><label>Đơn vị gửi *</label>'+selHtml('dv_gui',M.dv_gui)+'</div>'+
    '<div><label>Loại yêu cầu *</label>'+selHtml('loai',M.loai)+'</div><div><label>Đơn vị tiếp nhận *</label>'+selHtml('dv_tn',M.dv_tn)+'</div><div><label>Nhóm sửa chữa</label>'+selHtml('nhom',M.nhom,'','(không)')+'</div><div><label>Mức ưu tiên</label>'+prioSel('Bình thường',true)+'</div>'+
@@ -615,7 +616,7 @@ function detailBody(r){var s=st(r),W=canW(),RQ=isReq(),RO=RQ&&r.tt==='Open'&&r.t
   var body='<div style="margin-bottom:8px"><span class="tag t-'+esc(r.tt)+'">'+esc(r.tt)+'</span> '+(pr(r)!=='Bình thường'?prTag(r)+' ':'')+'</div>'+(s.qua?'<span class="flag">Quá hạn '+dd(today(),r.deadline)+' ngày'+(s.chuaGH?' – chưa xin gia hạn':'')+'</span>':'')+
    (RS(r)?' <span class="flag">Cần rà soát: '+esc(r.ghi_chu_rs)+'</span>':'')+(String(r.legacy)==='1'?' <span class="mu">Dữ liệu từ file cũ ('+esc(r.ma_cu)+(r.pl_cu?' · '+esc(r.pl_cu):'')+')</span>':'')+
    (r.tt==='Pending'?'<br>Lý do Pending: '+esc(r.ly_do_pending):'')+'</div>'+
-   (W&&String(r.legacy)!=='1'&&r.tt!=='Closed'&&(!r.loai||!r.dv_tn)?'<div class="warnbox" style="margin:8px 0"><b>Yêu cầu mới chưa phân loại.</b> Hãy kiểm tra thông tin, chọn <b>Loại yêu cầu</b>, <b>Đơn vị tiếp nhận</b>, <b>Nhóm sửa chữa</b> (nếu có), chỉnh các mục cho phù hợp rồi bấm Lưu thông tin và chuyển trạng thái sang Inprogress.</div>':'')+
+   (W&&String(r.legacy)!=='1'&&r.tt!=='Closed'&&(!r.loai||!r.dv_tn)?'<div class="warnbox" style="margin:8px 0"><b>Yêu cầu mới chưa phân loại.</b> Hãy kiểm tra thông tin, đặt <b>Mức ưu tiên</b> và <b>Hạn hoàn thành</b> (hiện là hạn tạm), chọn <b>Loại yêu cầu</b>, <b>Đơn vị tiếp nhận</b>, <b>Nhóm sửa chữa</b> (nếu có), chỉnh các mục cho phù hợp rồi bấm Lưu thông tin và chuyển trạng thái sang Inprogress.</div>':'')+
    (RQ&&!r.loai?'<p class="note">Người tiếp nhận sẽ phân loại và chuyển tới đơn vị xử lý.</p>':'')+
    '<form class="f" id="ef">'+(W&&r.deadline_goc&&r.deadline===r.deadline_goc?'<div><label>Hạn hoàn thành dự kiến (hạn gốc)</label><input type="date" name="deadline_goc" value="'+esc(r.deadline_goc)+'"></div>':'<div><label>Hạn hiện tại (hạn gốc '+fmt(r.deadline_goc)+')</label><input value="'+fmt(r.deadline)+'" disabled></div>')+
    '<div><label>Trạng thái</label><select name="tt_sel"'+(W?'':' disabled')+'>'+['Open','Inprogress','Pending','Closed'].map(function(k){return '<option'+(k===r.tt?' selected':'')+'>'+k+'</option>'}).join('')+'</select></div>'+'<div><label>Mức ưu tiên</label>'+prioSel(r.uu_tien,E('uu_tien'))+'</div>'+inp('ngay_tn','Ngày tiếp nhận','date')+inp('nguoi_gui','Người gửi')+inp('sdt','SĐT')+
@@ -683,7 +684,8 @@ document.addEventListener('click',function(ev){var t=ev.target,x;
   if((x=t.closest('.kpi'))){S.f.nhanh=x.dataset.nhanh;S.f.tt='';S.page=1;render();var l=$('#lst');if(l)l.scrollIntoView();return}
   if(t.id==='thm'){var L=document.documentElement.getAttribute('data-theme')==='light';if(L)document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme','light');try{localStorage.setItem('theme',L?'dark':'light')}catch(e){}thmLbl();return}
   if(t.id==='new'){newDlg();return}
-  if(t.id==='clr'){S.f={q:'',uu_tien:'',tt:'',loai:'',dv_gui:'',dv_tn:'',nhom:'',nhanh:'',tu:'',den:'',cu:S.f.cu};S.page=1;render();return}
+  if(t.id==='clr'){S.f={q:'',uu_tien:'',tt:isReq()?'':'Inprogress',loai:'',dv_gui:'',dv_tn:'',nhom:'',nhanh:'',tu:'',den:'',cu:S.f.cu};S.page=1;render();return}
+  if(t.id==='clrn'){S.f.nhanh='';S.f.tt=isReq()?'':'Inprogress';S.page=1;render();return}
   if(t.id==='csv'){csvOut();return}
   if(t.id==='del'){delDlg($('#dlg').dataset.id);return}
   if(t.id==='ddo'){var did=$('#dlg').dataset.id,why=$('#dwhy').value.trim();if(!why){toast('Vui lòng nhập lý do xóa',true);return}t.disabled=true;
@@ -729,7 +731,7 @@ document.addEventListener('click',function(ev){var t=ev.target,x;
     var bad=fl.filter(function(f){return !/^image\//.test(f.type)});if(bad.length){toast('Chỉ đính kèm được ảnh',true);t.disabled=false;return}
     if(PB&&!o.ma_gui){if(ne)ne.textContent='Hãy nhập mã VAE hợp lệ của người gửi (VD: VAE02284).';t.disabled=false;return}
     if((PB||isReq())&&!String(o.sdt||'').replace(/\D/g,'')){if(ne)ne.textContent='Hãy nhập số điện thoại liên hệ (không được để trống).';else toast('Hãy nhập số điện thoại liên hệ',true);t.disabled=false;return}
-    (PB?gs('submitPublic',o):run(gs('createRequest',o))).then(function(r){newId=r.request_id;uk=r.ukey||'';S.f.tt='';return fl.length?uploadList(newId,fl,function(i,n){t.textContent='Đang tải ảnh '+i+'/'+n+'…'},uk):0}).then(function(){closeDlg();
+    (PB?gs('submitPublic',o):run(gs('createRequest',o))).then(function(r){newId=r.request_id;uk=r.ukey||'';if(!PB)S.f.tt='';return fl.length?uploadList(newId,fl,function(i,n){t.textContent='Đang tải ảnh '+i+'/'+n+'…'},uk):0}).then(function(){closeDlg();
       if(PB){openDlg('Đã gửi yêu cầu','<p style="font-size:1.05rem">Yêu cầu của bạn đã được ghi nhận với mã <b>'+esc(newId)+'</b>.</p><p class="note">Người tiếp nhận đã được báo qua email và sẽ kiểm tra, phân loại, xử lý. Bạn không cần làm gì thêm. Nếu cần bổ sung, hãy liên hệ người tiếp nhận kèm mã yêu cầu trên.</p>','<button class="b" id="again">Gửi yêu cầu khác</button>');if(S.boot)load().catch(function(){});return}
       toast('Đã '+(isReq()?'gửi':'tạo')+' '+newId);return load()}).catch(function(e){if(newId){closeDlg();if(PB)openDlg('Đã gửi yêu cầu','<p>Yêu cầu đã được ghi nhận với mã <b>'+esc(newId)+'</b>, nhưng tải ảnh bị lỗi: '+esc((e&&e.message)||'')+'</p><p class="note">Hãy gửi ảnh trực tiếp cho người tiếp nhận.</p>','<button class="b" id="again">Đóng</button>');else{load();toast('Đã tạo '+newId+' nhưng tải ảnh lỗi: '+(e&&e.message||''),true)}}else if(PB&&ne)ne.textContent=(e&&e.message)||'Không gửi được, hãy thử lại.'}).then(function(){t.disabled=false;t.textContent=PB||isReq()?'Gửi yêu cầu':'Tạo yêu cầu'});return}
   if(t.id==='again'){closeDlg();if(PB0()){newDlg()};return}
