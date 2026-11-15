@@ -3,6 +3,7 @@
 <head>
 <link rel="preconnect" href="https://script.google.com">
 <link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<script src="config.js"></script>
 <script>try{var __t=localStorage.getItem('theme');if(__t==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}</script>
 
 <meta charset="utf-8">
@@ -325,7 +326,6 @@ html[data-theme=light] .usr button.b{background:rgba(255,255,255,.1)!important;c
 <main id="main"><p>Đang tải…</p></main></section></div>
 <dialog id="dlg"><div class="dh"><b id="dt"></b><button class="b sec" id="dx">Đóng</button></div><div class="db" id="dbody"></div><div id="dmsg" class="dmsg"></div><div class="df" id="dfoot"></div></dialog>
 <div id="toast"></div>
-<script src="config.js"></script>
 <script>
 var S = {tok:'',tab:'tq', data:[], boot:null, f:{q:'',uu_tien:'',tt:'Inprogress',loai:'',dv_gui:'',dv_tn:'',nhom:'',nhanh:'',tu:'',den:'',cu:true}, page:1, sort:{k:'deadline',d:1}};
 function $(s,e){return (e||document).querySelector(s)}
@@ -354,7 +354,7 @@ function prefetch(){if(!S.boot||S.boot.me.guest||isReq())return;var a=function(k
   a('gh',function(){return gs0('listExtensions')});if(isAdmin())a('qt',function(){return gs0('getAdminData')})}
 function gs0(fn){var a=[].slice.call(arguments,1);a.unshift(S.tok||'');
   if(window.google&&google.script&&google.script.run)return new Promise(function(ok,no){google.script.run.withSuccessHandler(ok).withFailureHandler(function(e){no(new Error((e&&e.message)||e))})[fn].apply(google.script.run,a)});
-  var url=window.APP_API_URL;if(!url||/DÁN/.test(url))return Promise.reject(new Error('Chưa cấu hình địa chỉ API (tệp config.js).'));
+  var url=String(window.APP_API_URL||'').trim();if(!url||/DÁN/.test(url))return Promise.reject(new Error('Chưa cấu hình địa chỉ API (tệp config.js).'));
   var ac=window.AbortController?new AbortController():null,tm=ac?setTimeout(function(){ac.abort()},60000):0;
   return fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:a}),redirect:'follow',signal:ac?ac.signal:undefined})
     .then(function(r){clearTimeout(tm);return r},function(){clearTimeout(tm);throw new Error('Không kết nối được máy chủ hoặc máy chủ phản hồi quá chậm. Hãy thử lại.')})
